@@ -1,0 +1,55 @@
+version: "2"
+
+run:
+  timeout: 5m
+  build-tags:
+    - integration
+    - e2e
+
+linters:
+  default: standard
+  enable:
+    - gocyclo
+    - gocognit
+    - errorlint
+    - bodyclose
+    - noctx
+    - misspell
+    - revive
+    - gosec
+    - unconvert
+    - unparam
+    - nilerr
+    - sqlclosecheck
+    - rowserrcheck
+    - contextcheck
+    - copyloopvar
+  settings:
+    gocyclo:
+      # Reports functions whose cyclomatic complexity is greater than 6.
+      min-complexity: 6
+    gocognit:
+      # Reports functions whose cognitive complexity is greater than 10.
+      min-complexity: 10
+    gosec:
+      excludes:
+        - G115 # int conversions are bounds-checked explicitly where needed
+        - G404 # math/rand is fine outside of crypto/security contexts
+  exclusions:
+    presets:
+      - std-error-handling
+    rules:
+      - path: _test\.go
+        linters:
+          - unparam
+          - gosec
+          - errcheck
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/Pantani/backend-challenge-go

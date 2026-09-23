@@ -1,0 +1,110 @@
+name: wallet
+
+x-app: &app
+  build: .
+  image: wallet-service:local
+  restart: unless-stopped
+  env_file: .env.example
+  environment: &app-env
+    # Least-privilege runtime login (deploy/postgres/init); only the migrate
+    # service connects as the schema owner.
+    DATABASE_URL: postgres://wallet_service:wallet_service@postgres:5432/wallet?sslmode=disable
+    AWS_ENDPOINT_URL: http://localstack:4566
+    OIDC_ISSUER: http://localhost:8180/realms/wallet
+    OIDC_JWKS_URL: http://keycloak:8080/realms/wallet/protocol/openid-connect/certs
+    HTTP_ADDR: ":8080"
+  depends_on: &app-deps
+    migrate:
+      condition: service_completed_successfully
+    provision-queues:
+      condition: service_completed_successfully
+    keycloak:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: wallet
+      POSTGRES_PASSWORD: wallet
+      POSTGRES_DB: wallet
+    volumes:
+      # Creates the runtime login on first start (empty data directory only).
+      - ./deploy/postgres/init:/docker-entrypoint-initdb.d:ro
+    ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wallet -d wallet"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  localstack:
+    image: localstack/localstack:4.4
+    environment:
+      SERVICES: sqs
+      AWS_DEFAULT_REGION: us-east-1
+    ports: ["4566:4566"]
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:4566/_localstack/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.3
+    command: ["start-dev", "--import-realm", "--health-enabled=true"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HOSTNAME: http://localhost:8180
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+    volumes:
+      - ./deploy/keycloak/realm-wallet.json:/opt/keycloak/data/import/realm-wallet.json:ro
+    ports: ["8180:8080"]
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+
+  migrate:
+    <<: *app
+    restart: "no"
+    command: ["migrate", "up"]
+    environment:
+      <<: *app-env
+      # The schema owner applies the migrations.
+      DATABASE_URL: postgres://wallet:wallet@postgres:5432/wallet?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  provision-queues:
+    <<: *app
+    restart: "no"
+    command: ["provision-queues"]
+    depends_on:
+      localstack:
+        condition: service_healthy
+
+  # Three independent instances (own process, memory and connections).
+  app-1:
+    <<: *app
+    environment:
+      <<: *app-env
+      INSTANCE_ID: app-1
+    ports: ["8080:8080"]
+
+  app-2:
+    <<: *app
+    environment:
+      <<: *app-env
+      INSTANCE_ID: app-2
+    ports: ["8081:8080"]
+
+  app-3:
+    <<: *app
+    environment:
+      <<: *app-env
+      INSTANCE_ID: app-3
+    ports: ["8082:8080"]

@@ -1,0 +1,35 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ResolveExistingQueues",
+      "Effect": "Allow",
+      "Action": "sqs:GetQueueUrl",
+      "Resource": [
+        "arn:aws:sqs:us-east-1:111122223333:wager-transactions.fifo",
+        "arn:aws:sqs:us-east-1:111122223333:wager-transactions-dlq.fifo",
+        "arn:aws:sqs:us-east-1:111122223333:wallet-events.fifo"
+      ]
+    },
+    {
+      "Sid": "ConsumeWagersAndCheckReadiness",
+      "Effect": "Allow",
+      "Action": [
+        "sqs:ReceiveMessage",
+        "sqs:DeleteMessage",
+        "sqs:ChangeMessageVisibility",
+        "sqs:GetQueueAttributes"
+      ],
+      "Resource": "arn:aws:sqs:us-east-1:111122223333:wager-transactions.fifo"
+    },
+    {
+      "Sid": "PublishEventsAndDeadLetters",
+      "Effect": "Allow",
+      "Action": "sqs:SendMessage",
+      "Resource": [
+        "arn:aws:sqs:us-east-1:111122223333:wager-transactions-dlq.fifo",
+        "arn:aws:sqs:us-east-1:111122223333:wallet-events.fifo"
+      ]
+    }
+  ]
+}
