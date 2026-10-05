@@ -1,0 +1,5 @@
+.git
+.env
+docs
+deploy/keycloak/*.json.bak
+**/*_test.go

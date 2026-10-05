@@ -1,0 +1,96 @@
+{
+  "timestamp": "2026-10-04T01:40:40.3815727Z",
+  "scenario": "many",
+  "environment": {
+    "go_version": "go1.26.0",
+    "os": "windows",
+    "arch": "amd64",
+    "cpus": 12
+  },
+  "params": {
+    "base": "http://localhost:8080",
+    "wallets": 50,
+    "workers": 32,
+    "duration": "40s",
+    "replay_ratio": 0.1,
+    "seed": 1
+  },
+  "result": {
+    "requests": 312862,
+    "duration_ms": 40002,
+    "rps": 7820.969684049443,
+    "p50_ms": 2.0003,
+    "p95_ms": 10.0105,
+    "p99_ms": 15.0535,
+    "max_ms": 10000.0452,
+    "statuses": {
+      "201": 35362
+    },
+    "conflicts_409_422": 0,
+    "transport_errors": {
+      "client_timeout": 1,
+      "connection_refused": 276454,
+      "connection_reset": 31,
+      "transport_error": 1014
+    }
+  },
+  "consistency": {
+    "passed": false,
+    "wallets_checked": 50,
+    "mismatches": [
+      "2cf8e297-1d8d-4528-89a4-792039e81722: read failed (0 Get \"http://localhost:8080/wallets/2cf8e297-1d8d-4528-89a4-792039e81722\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "e811b3de-ab52-40ce-a55b-22f8e6a8c34a: read failed (0 Get \"http://localhost:8080/wallets/e811b3de-ab52-40ce-a55b-22f8e6a8c34a\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "116cd23b-88a1-4930-8cae-5e65e1244113: read failed (0 Get \"http://localhost:8080/wallets/116cd23b-88a1-4930-8cae-5e65e1244113\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "31f7bef5-8126-4527-bbb2-575a6cec2ac8: read failed (0 Get \"http://localhost:8080/wallets/31f7bef5-8126-4527-bbb2-575a6cec2ac8\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "3d0c9def-f37e-4b1f-b6ba-94226ad5b318: read failed (0 Get \"http://localhost:8080/wallets/3d0c9def-f37e-4b1f-b6ba-94226ad5b318\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "5e6b0829-0cea-418c-aea9-0ed899eb22e9: read failed (0 Get \"http://localhost:8080/wallets/5e6b0829-0cea-418c-aea9-0ed899eb22e9\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "2070d2ed-1760-4ac2-a62a-4a135a185808: read failed (0 Get \"http://localhost:8080/wallets/2070d2ed-1760-4ac2-a62a-4a135a185808\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "1e79c608-5959-43ca-8632-f1b55d0f238c: read failed (0 Get \"http://localhost:8080/wallets/1e79c608-5959-43ca-8632-f1b55d0f238c\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "f60f592d-0f87-448f-ae84-082506c26c08: read failed (0 Get \"http://localhost:8080/wallets/f60f592d-0f87-448f-ae84-082506c26c08\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "a6c0cef7-8cd0-421a-9aa8-fd0f57fb3830: read failed (0 Get \"http://localhost:8080/wallets/a6c0cef7-8cd0-421a-9aa8-fd0f57fb3830\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "faf0b0e7-5e76-401d-9118-653f8f0f2ea0: read failed (0 Get \"http://localhost:8080/wallets/faf0b0e7-5e76-401d-9118-653f8f0f2ea0\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "91070f58-b051-4845-b470-656d8ef2e971: read failed (0 Get \"http://localhost:8080/wallets/91070f58-b051-4845-b470-656d8ef2e971\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "2cca0626-8a08-43b6-abe1-02bbcc76374c: read failed (0 Get \"http://localhost:8080/wallets/2cca0626-8a08-43b6-abe1-02bbcc76374c\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "a32b1b7f-baae-4299-8f5c-4d715d7c1afb: read failed (0 Get \"http://localhost:8080/wallets/a32b1b7f-baae-4299-8f5c-4d715d7c1afb\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "bf19888b-029a-46bb-80d2-a50ecaf50c9c: read failed (0 Get \"http://localhost:8080/wallets/bf19888b-029a-46bb-80d2-a50ecaf50c9c\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "572f42b9-a7f3-406f-a7ad-aad0e96be076: read failed (0 Get \"http://localhost:8080/wallets/572f42b9-a7f3-406f-a7ad-aad0e96be076\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "7bc8155e-608c-4604-a325-0700369bbbd7: read failed (0 Get \"http://localhost:8080/wallets/7bc8155e-608c-4604-a325-0700369bbbd7\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "39aec998-69c5-4913-a16e-1c00d5b82bbb: read failed (0 Get \"http://localhost:8080/wallets/39aec998-69c5-4913-a16e-1c00d5b82bbb\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "90ed0da6-beda-436b-84ba-6b66ae7df1ed: read failed (0 Get \"http://localhost:8080/wallets/90ed0da6-beda-436b-84ba-6b66ae7df1ed\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "6c29703b-724a-4f6b-81f5-5372b90ddacf: read failed (0 Get \"http://localhost:8080/wallets/6c29703b-724a-4f6b-81f5-5372b90ddacf\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "931b609e-2807-432e-a500-c7df25aa6204: read failed (0 Get \"http://localhost:8080/wallets/931b609e-2807-432e-a500-c7df25aa6204\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "2f8cbe52-6399-48ce-b3ae-5f057380e6d4: read failed (0 Get \"http://localhost:8080/wallets/2f8cbe52-6399-48ce-b3ae-5f057380e6d4\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "c136a1a1-0f67-4464-9ca2-c6316decb9a7: read failed (0 Get \"http://localhost:8080/wallets/c136a1a1-0f67-4464-9ca2-c6316decb9a7\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "e9ea3a94-3547-41e9-b0b3-674f7053055d: read failed (0 Get \"http://localhost:8080/wallets/e9ea3a94-3547-41e9-b0b3-674f7053055d\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "473245e6-fd50-4b5f-9352-e41e7c9a6fda: read failed (0 Get \"http://localhost:8080/wallets/473245e6-fd50-4b5f-9352-e41e7c9a6fda\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "4dee1291-8562-4ac8-84a4-b29abf5b3386: read failed (0 Get \"http://localhost:8080/wallets/4dee1291-8562-4ac8-84a4-b29abf5b3386\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "25f9088c-5b02-4f9c-800b-fdd832c1e590: read failed (0 Get \"http://localhost:8080/wallets/25f9088c-5b02-4f9c-800b-fdd832c1e590\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "85f5e5c2-7916-4ff3-a01e-6836fb0cc3df: read failed (0 Get \"http://localhost:8080/wallets/85f5e5c2-7916-4ff3-a01e-6836fb0cc3df\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "cd0c8367-36c7-46ba-aeb0-7023c0f7cafa: read failed (0 Get \"http://localhost:8080/wallets/cd0c8367-36c7-46ba-aeb0-7023c0f7cafa\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "2149b788-9ca5-451a-a7a1-15e874317ba3: read failed (0 Get \"http://localhost:8080/wallets/2149b788-9ca5-451a-a7a1-15e874317ba3\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "30ab94f1-6745-4733-b016-8241dbccc064: read failed (0 Get \"http://localhost:8080/wallets/30ab94f1-6745-4733-b016-8241dbccc064\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "61c19efb-6902-4f39-ad20-3fafb97a9a93: read failed (0 Get \"http://localhost:8080/wallets/61c19efb-6902-4f39-ad20-3fafb97a9a93\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "525634ea-3140-4304-83a3-45f4cc22418b: read failed (0 Get \"http://localhost:8080/wallets/525634ea-3140-4304-83a3-45f4cc22418b\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "f2564c77-3b04-460c-bfc4-14d541f292c8: read failed (0 Get \"http://localhost:8080/wallets/f2564c77-3b04-460c-bfc4-14d541f292c8\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "ed6d1acf-5dc1-45db-bf33-bc62e244d390: read failed (0 Get \"http://localhost:8080/wallets/ed6d1acf-5dc1-45db-bf33-bc62e244d390\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "82838c4c-bf1f-49fe-830a-f5fb18152ff5: read failed (0 Get \"http://localhost:8080/wallets/82838c4c-bf1f-49fe-830a-f5fb18152ff5\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "d465a4f7-dc71-4f47-9198-dc71d92f323f: read failed (0 Get \"http://localhost:8080/wallets/d465a4f7-dc71-4f47-9198-dc71d92f323f\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "df4eedd9-4c39-47ca-87d3-5e4ace9f9328: read failed (0 Get \"http://localhost:8080/wallets/df4eedd9-4c39-47ca-87d3-5e4ace9f9328\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "e8249eb5-b7f1-4cf4-9e41-79f9a108609e: read failed (0 Get \"http://localhost:8080/wallets/e8249eb5-b7f1-4cf4-9e41-79f9a108609e\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "ed9fea39-714d-494c-aeec-1b15a0a0198d: read failed (0 Get \"http://localhost:8080/wallets/ed9fea39-714d-494c-aeec-1b15a0a0198d\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "0ba65991-e8b0-416f-90df-30d9ddac4733: read failed (0 Get \"http://localhost:8080/wallets/0ba65991-e8b0-416f-90df-30d9ddac4733\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "61616359-3a86-479c-b424-ec5743362043: read failed (0 Get \"http://localhost:8080/wallets/61616359-3a86-479c-b424-ec5743362043\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "73580dc6-3f44-4a64-a31b-07d23af22bb7: read failed (0 Get \"http://localhost:8080/wallets/73580dc6-3f44-4a64-a31b-07d23af22bb7\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "d87f676e-420e-4f63-9e5a-422a01383f92: read failed (0 Get \"http://localhost:8080/wallets/d87f676e-420e-4f63-9e5a-422a01383f92\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "e4467619-30c3-4d9c-ba31-6c79f955b914: read failed (0 Get \"http://localhost:8080/wallets/e4467619-30c3-4d9c-ba31-6c79f955b914\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "1cd91796-da5c-4994-9321-3acb4e914218: read failed (0 Get \"http://localhost:8080/wallets/1cd91796-da5c-4994-9321-3acb4e914218\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "43ad1566-304a-4bc8-bab3-81f118a027aa: read failed (0 Get \"http://localhost:8080/wallets/43ad1566-304a-4bc8-bab3-81f118a027aa\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "fbd47c0c-2c42-4654-aad7-97f7d016e036: read failed (0 Get \"http://localhost:8080/wallets/fbd47c0c-2c42-4654-aad7-97f7d016e036\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "e0ed8f50-763d-4006-9c10-61578e84b867: read failed (0 Get \"http://localhost:8080/wallets/e0ed8f50-763d-4006-9c10-61578e84b867\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)",
+      "f005922c-5a98-4cbe-8e86-ce5790baa832: read failed (0 Get \"http://localhost:8080/wallets/f005922c-5a98-4cbe-8e86-ce5790baa832\": dial tcp [::1]:8080: connectex: No connection could be made because the target machine actively refused it.)"
+    ]
+  },
+  "not_measured": [
+    "outbox delay: there is no outbox publisher"
+  ]
+}

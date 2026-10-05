@@ -1,0 +1,2 @@
+DROP INDEX IF EXISTS outbox_seq_key;
+ALTER TABLE outbox DROP COLUMN IF EXISTS seq;

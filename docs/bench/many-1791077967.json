@@ -1,0 +1,49 @@
+{
+  "timestamp": "2026-10-04T01:39:27.4337609Z",
+  "scenario": "many",
+  "environment": {
+    "go_version": "go1.26.0",
+    "os": "windows",
+    "arch": "amd64",
+    "cpus": 12
+  },
+  "params": {
+    "base": "http://localhost:8080",
+    "wallets": 50,
+    "workers": 32,
+    "duration": "1m0s",
+    "replay_ratio": 0.1,
+    "seed": 1
+  },
+  "result": {
+    "requests": 142089,
+    "duration_ms": 60014,
+    "rps": 2367.5776736110697,
+    "p50_ms": 10.78,
+    "p95_ms": 16.2886,
+    "p99_ms": 20.0055,
+    "max_ms": 10000.2455,
+    "statuses": {
+      "201": 139711
+    },
+    "conflicts_409_422": 0,
+    "transport_errors": {
+      "client_timeout": 1,
+      "connection_reset": 31,
+      "transport_error": 2346
+    }
+  },
+  "consistency": {
+    "passed": false,
+    "wallets_checked": 50,
+    "mismatches": [
+      "1e533b9a-c2c6-47d8-b893-4f8bc5fcd9db: balance 99743300, expected 99743400",
+      "2188dd17-da56-4545-91f3-4700600a77b3: balance 99741300, expected 99741400",
+      "683e4d58-78c0-4ddf-8c50-3965185c6e05: balance 99751400, expected 99751500",
+      "ec8e8607-d55c-47e9-bb1d-23bfa2f8fbb4: balance 99750600, expected 99750700"
+    ]
+  },
+  "not_measured": [
+    "outbox delay: there is no outbox publisher"
+  ]
+}

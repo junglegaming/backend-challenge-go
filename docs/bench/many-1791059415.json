@@ -1,0 +1,40 @@
+{
+  "timestamp": "2026-10-03T20:30:15.7947699Z",
+  "scenario": "many",
+  "environment": {
+    "go_version": "go1.26.0",
+    "os": "windows",
+    "arch": "amd64",
+    "cpus": 12,
+    "note": "Windows 11, Docker Desktop, tudo na mesma maquina"
+  },
+  "params": {
+    "base": "http://localhost:8080",
+    "wallets": 50,
+    "workers": 32,
+    "duration": "1m0s",
+    "replay_ratio": 0.1,
+    "seed": 1
+  },
+  "result": {
+    "requests": 151406,
+    "duration_ms": 60011,
+    "rps": 2522.9303955687446,
+    "p50_ms": 12.0065,
+    "p95_ms": 17.933,
+    "p99_ms": 23.027,
+    "max_ms": 69.7954,
+    "statuses": {
+      "201": 151406
+    },
+    "conflicts_409_422": 0,
+    "transport_errors": {}
+  },
+  "consistency": {
+    "passed": true,
+    "wallets_checked": 50
+  },
+  "not_measured": [
+    "outbox delay: there is no outbox publisher"
+  ]
+}
