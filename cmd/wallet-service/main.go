@@ -82,7 +82,13 @@ var SQSModule = fx.Provide(
 )
 
 var WorkersModule = fx.Provide(
-	workers.NewOutboxWorker,
+	func(lc fx.Lifecycle, database *db.PostgresDB, sqsClient *sqs.Client) *workers.OutboxWorker {
+		outboxURL := os.Getenv("OUTBOX_QUEUE_URL")
+		if outboxURL == "" {
+			outboxURL = "http://localhost:4566/000000000000/outbox-events.fifo"
+		}
+		return workers.NewOutboxWorker(lc, database, sqsClient, outboxURL)
+	},
 	workers.NewPendingReferenceWorker,
 )
 

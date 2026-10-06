@@ -19,11 +19,11 @@ type OutboxWorker struct {
 	cancel    context.CancelFunc
 }
 
-func NewOutboxWorker(lc fx.Lifecycle, database *db.PostgresDB, sqsClient *sqs.Client) *OutboxWorker {
+func NewOutboxWorker(lc fx.Lifecycle, database *db.PostgresDB, sqsClient *sqs.Client, queueUrl string) *OutboxWorker {
 	worker := &OutboxWorker{
 		db:        database,
 		sqsClient: sqsClient,
-		topicArn:  "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/outbox-events.fifo",
+		topicArn:  queueUrl,
 	}
 
 	lc.Append(fx.Hook{
