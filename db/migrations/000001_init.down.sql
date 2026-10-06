@@ -1,8 +1,9 @@
-DROP TRIGGER IF EXISTS wallet_ledger_append_only ON wallet_ledger;
-DROP FUNCTION IF EXISTS prevent_update_delete();
-
-DROP TABLE IF EXISTS inbox_messages;
+DROP TRIGGER IF EXISTS prevent_terminal_transaction_update ON transactions;
+DROP FUNCTION IF EXISTS trg_protect_terminal_transactions;
+DROP TRIGGER IF EXISTS prevent_ledger_update_delete ON ledger_entries;
+DROP FUNCTION IF EXISTS trg_protect_ledger;
 DROP TABLE IF EXISTS outbox_events;
-DROP TABLE IF EXISTS wallet_ledger;
-DROP TABLE IF EXISTS wager_transactions;
+DROP TABLE IF EXISTS inbox_events;
+DROP TABLE IF EXISTS ledger_entries;
+DROP TABLE IF EXISTS transactions;
 DROP TABLE IF EXISTS wallets;
