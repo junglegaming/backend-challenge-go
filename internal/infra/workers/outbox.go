@@ -7,26 +7,36 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/fx"
+
+	"github.com/Lzdevmendes/backend-challenge-go/internal/infra/db"
 )
 
 type OutboxWorker struct {
-	pool      *pgxpool.Pool
+	db        *db.PostgresDB
 	sqsClient *sqs.Client
-	topicArn  string // Or queueURL
+	topicArn  string
+	cancel    context.CancelFunc
 }
 
-func NewOutboxWorker(lc fx.Lifecycle, pool *pgxpool.Pool, sqsClient *sqs.Client) *OutboxWorker {
+func NewOutboxWorker(lc fx.Lifecycle, database *db.PostgresDB, sqsClient *sqs.Client) *OutboxWorker {
 	worker := &OutboxWorker{
-		pool:      pool,
+		db:        database,
 		sqsClient: sqsClient,
-		topicArn:  "http://localhost:4566/000000000000/outbox-events.fifo", // Using SQS directly for simplicity
+		topicArn:  "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/outbox-events.fifo",
 	}
 
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			go worker.Start()
+			var wCtx context.Context
+			wCtx, worker.cancel = context.WithCancel(context.Background())
+			go worker.Start(wCtx)
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			if worker.cancel != nil {
+				worker.cancel()
+			}
 			return nil
 		},
 	})
@@ -34,37 +44,41 @@ func NewOutboxWorker(lc fx.Lifecycle, pool *pgxpool.Pool, sqsClient *sqs.Client)
 	return worker
 }
 
-func (w *OutboxWorker) Start() {
+func (w *OutboxWorker) Start(ctx context.Context) {
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
 	for {
-		<-ticker.C
-		w.processBatch()
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			w.processBatch(ctx)
+		}
 	}
 }
 
-func (w *OutboxWorker) processBatch() {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+func (w *OutboxWorker) processBatch(ctx context.Context) {
+	batchCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	tx, err := w.pool.Begin(ctx)
+	tx, err := w.db.Pool.Begin(batchCtx)
 	if err != nil {
 		log.Printf("outbox worker failed to begin tx: %v", err)
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback(batchCtx)
 
 	query := `
-		SELECT id, event_type, payload
+		SELECT id, event_type, payload, attempts
 		FROM outbox_events
-		WHERE status = 'PENDING'
+		WHERE status = 'PENDING' AND next_attempt_at <= $1
 		ORDER BY created_at ASC
 		FOR UPDATE SKIP LOCKED
-		LIMIT 10
+		LIMIT 20
 	`
 
-	rows, err := tx.Query(ctx, query)
+	rows, err := tx.Query(batchCtx, query, time.Now().UTC())
 	if err != nil {
 		log.Printf("outbox worker failed to query: %v", err)
 		return
@@ -74,12 +88,13 @@ func (w *OutboxWorker) processBatch() {
 		ID        string
 		EventType string
 		Payload   string
+		Attempts  int
 	}
 
 	var events []outboxEvent
 	for rows.Next() {
 		var e outboxEvent
-		if err := rows.Scan(&e.ID, &e.EventType, &e.Payload); err != nil {
+		if err := rows.Scan(&e.ID, &e.EventType, &e.Payload, &e.Attempts); err != nil {
 			log.Printf("outbox worker scan error: %v", err)
 			continue
 		}
@@ -92,36 +107,53 @@ func (w *OutboxWorker) processBatch() {
 	}
 
 	var processedIDs []string
+	var failedEvents []outboxEvent
 
 	for _, e := range events {
-		_, err := w.sqsClient.SendMessage(ctx, &sqs.SendMessageInput{
+		_, err := w.sqsClient.SendMessage(batchCtx, &sqs.SendMessageInput{
 			QueueUrl:               aws.String(w.topicArn),
 			MessageBody:            aws.String(e.Payload),
-			MessageGroupId:         aws.String(e.EventType),
+			MessageGroupId:         aws.String("outbox-group"),
 			MessageDeduplicationId: aws.String(e.ID),
 		})
 
 		if err != nil {
 			log.Printf("failed to publish outbox event %s: %v", e.ID, err)
-			continue // Proceed to next event. The failed one will be retried on next loop.
+			failedEvents = append(failedEvents, e)
+			continue
 		}
 
 		processedIDs = append(processedIDs, e.ID)
 	}
 
+	now := time.Now().UTC()
+
 	if len(processedIDs) > 0 {
 		updateQuery := `
 			UPDATE outbox_events
-			SET status = 'PUBLISHED'
-			WHERE id = ANY($1)
+			SET status = 'PUBLISHED', published_at = $1
+			WHERE id = ANY($2)
 		`
-		if _, err := tx.Exec(ctx, updateQuery, processedIDs); err != nil {
-			log.Printf("outbox worker failed to update status: %v", err)
+		if _, err := tx.Exec(batchCtx, updateQuery, now, processedIDs); err != nil {
+			log.Printf("outbox worker failed to update published status: %v", err)
 			return
 		}
 	}
 
-	if err := tx.Commit(ctx); err != nil {
+	for _, e := range failedEvents {
+		newAttempts := e.Attempts + 1
+		nextAttempt := now.Add(time.Duration(newAttempts*2) * time.Second)
+		failQuery := `
+			UPDATE outbox_events
+			SET attempts = $1, next_attempt_at = $2
+			WHERE id = $3
+		`
+		if _, err := tx.Exec(batchCtx, failQuery, newAttempts, nextAttempt, e.ID); err != nil {
+			log.Printf("outbox worker failed to update failed status: %v", err)
+		}
+	}
+
+	if err := tx.Commit(batchCtx); err != nil {
 		log.Printf("outbox worker failed to commit: %v", err)
 	}
 }

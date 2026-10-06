@@ -83,6 +83,7 @@ func (uc *PendingReferenceUseCase) ProcessBatch(ctx context.Context, batchSize i
 
 			switch decision {
 			case domain.ReferenceWait:
+				_ = uc.repo.UpdatePendingAttempt(ctx, tx, wagerTx.ID())
 				continue
 			case domain.ReferenceRejected:
 				_ = publishRejected(failureCode, domain.Money{})

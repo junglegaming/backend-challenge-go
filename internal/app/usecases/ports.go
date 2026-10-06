@@ -19,6 +19,7 @@ type WalletRepository interface {
 	InsertWagerTransaction(ctx context.Context, tx pgx.Tx, t *domain.WagerTransaction) error
 	UpdateWagerTransactionStatus(ctx context.Context, tx pgx.Tx, txID uuid.UUID, status domain.Status, failureCode domain.FailureCode) error
 	UpdateWagerTransactionProcessed(ctx context.Context, tx pgx.Tx, t *domain.WagerTransaction) error
+	UpdatePendingAttempt(ctx context.Context, tx pgx.Tx, txID uuid.UUID) error
 	InsertLedgerEntry(ctx context.Context, tx pgx.Tx, entryID, walletID, transactionID uuid.UUID, movement domain.Movement) error
 	InsertOutboxEvent(ctx context.Context, tx pgx.Tx, eventType string, payload any) error
 	CheckIdempotency(ctx context.Context, tx pgx.Tx, providerID, externalTxID string) (*domain.WagerTransaction, error)

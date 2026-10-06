@@ -277,10 +277,10 @@ func (r *WalletRepository) HasProcessedReversalInTx(ctx context.Context, tx pgx.
 
 func (r *WalletRepository) GetPendingReferenceTxIDsInTx(ctx context.Context, tx pgx.Tx, limit int) ([]uuid.UUID, error) {
 	query := `SELECT id FROM transactions 
-              WHERE status = 'PENDING_REFERENCE' 
-              ORDER BY created_at ASC 
-              FOR UPDATE SKIP LOCKED LIMIT $1`
-	rows, err := tx.Query(ctx, query, limit)
+              WHERE status = 'PENDING_REFERENCE' AND (next_attempt_at IS NULL OR next_attempt_at <= $1)
+              ORDER BY next_attempt_at ASC NULLS FIRST 
+              FOR UPDATE SKIP LOCKED LIMIT $2`
+	rows, err := tx.Query(ctx, query, time.Now().UTC(), limit)
 	if err != nil {
 		return nil, err
 	}
@@ -304,4 +304,13 @@ func (r *WalletRepository) FindTransactionByIDInTx(ctx context.Context, tx pgx.T
               FROM transactions
               WHERE id = $1 LIMIT 1`
 	return r.scanTransaction(tx.QueryRow(ctx, query, id))
+}
+
+func (r *WalletRepository) UpdatePendingAttempt(ctx context.Context, tx pgx.Tx, txID uuid.UUID) error {
+	query := `UPDATE transactions 
+              SET attempts = attempts + 1, 
+                  next_attempt_at = $1 + (POWER(2, attempts) * interval '1 second')
+              WHERE id = $2`
+	_, err := tx.Exec(ctx, query, time.Now().UTC(), txID)
+	return err
 }
