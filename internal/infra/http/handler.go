@@ -16,14 +16,16 @@ type Handler struct {
 	createWallUC *usecases.CreateWalletUseCase
 	queriesUC    *usecases.QueryUseCase
 	authMW       *AuthMiddleware
+	health       *HealthHandler
 }
 
-func NewHandler(processTxUC *usecases.ProcessTransactionUseCase, createWallUC *usecases.CreateWalletUseCase, queriesUC *usecases.QueryUseCase, authMW *AuthMiddleware) *Handler {
+func NewHandler(processTxUC *usecases.ProcessTransactionUseCase, createWallUC *usecases.CreateWalletUseCase, queriesUC *usecases.QueryUseCase, authMW *AuthMiddleware, health *HealthHandler) *Handler {
 	return &Handler{
 		processTxUC:  processTxUC,
 		createWallUC: createWallUC,
 		queriesUC:    queriesUC,
 		authMW:       authMW,
+		health:       health,
 	}
 }
 
@@ -37,8 +39,10 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /wagering/transactions/{transactionId}", h.authMW.RequireRole("wallet-admin", h.GetTransaction))
 	mux.HandleFunc("GET /providers/{providerId}/wagering/transactions/{externalTransactionId}", h.authMW.RequireRole("wager-provider", h.GetTransactionByExternalID))
 
-	mux.HandleFunc("GET /health/live", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
-	mux.HandleFunc("GET /health/ready", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
+	mux.HandleFunc("GET /health/live", h.health.Live)
+	mux.HandleFunc("GET /health/ready", h.health.Ready)
+
+	RegisterMetrics(mux)
 }
 
 type CreateWalletRequest struct {

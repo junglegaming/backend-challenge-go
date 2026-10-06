@@ -4,18 +4,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"go.uber.org/fx"
 )
 
-func NewServer(lc fx.Lifecycle, handler *Handler) *http.Server {
+func NewServer(lc fx.Lifecycle, handler *Handler, logger *slog.Logger) *http.Server {
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 
 	srv := &http.Server{
 		Addr:    ":8080",
-		Handler: mux,
+		Handler: LoggerMiddleware(logger, mux),
 	}
 
 	lc.Append(fx.Hook{
