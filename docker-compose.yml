@@ -76,7 +76,7 @@ services:
       - KEYCLOAK_ISSUER_URL=http://keycloak:8080/realms/wallet
       - HTTP_ADDR=:8080
     ports:
-      - "8081:8080"
+      - "8091:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -102,7 +102,7 @@ services:
       - KEYCLOAK_ISSUER_URL=http://keycloak:8080/realms/wallet
       - HTTP_ADDR=:8080
     ports:
-      - "8082:8080"
+      - "8092:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -128,7 +128,7 @@ services:
       - KEYCLOAK_ISSUER_URL=http://keycloak:8080/realms/wallet
       - HTTP_ADDR=:8080
     ports:
-      - "8083:8080"
+      - "8093:8080"
     depends_on:
       postgres:
         condition: service_healthy

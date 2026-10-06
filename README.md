@@ -16,11 +16,11 @@ Este repositório contém a implementação do serviço distribuído de carteira
    ```bash
    docker-compose up --build -d
    ```
-   > Esse comando irá subir o banco de dados, aplicar as migrations (via o container `migrate`), instanciar filas no SQS (via `tools/sqs-setup.sh`), importar as configurações do Keycloak, e inicializar 3 réplicas concorrentes da aplicação (`wallet-app-1`, `wallet-app-2`, `wallet-app-3` nas portas 8081, 8082, 8083).
+   > Esse comando irá subir o banco de dados, aplicar as migrations (via o container `migrate`), instanciar filas no SQS (via `tools/sqs-setup.sh`), importar as configurações do Keycloak, e inicializar 3 réplicas concorrentes da aplicação (`wallet-app-1`, `wallet-app-2`, `wallet-app-3` nas portas 8091, 8092, 8093).
 
 2. Acesse a rota de métricas de uma das aplicações para garantir que está de pé:
    ```bash
-   curl http://localhost:8081/metrics
+   curl http://localhost:8091/metrics
    ```
 
 3. Geração do Token OIDC (Keycloak admin):
