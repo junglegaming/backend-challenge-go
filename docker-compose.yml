@@ -56,7 +56,7 @@ services:
     volumes:
       - ./tools/keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
     healthcheck:
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080 && echo -e 'GET /health/ready HTTP/1.1\r\nhost: http://localhost\r\nConnection: close\r\n\r\n' >&3 && cat <&3 | grep '200 OK'"]
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080 && echo -e 'GET /realms/master HTTP/1.1\r\nHost: localhost:8080\r\nConnection: close\r\n\r\n' >&3 && cat <&3 | grep '200 OK'"]
       interval: 10s
       timeout: 5s
       retries: 10
