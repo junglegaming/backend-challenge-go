@@ -21,20 +21,20 @@ func NewWalletRepository(db *PostgresDB) *WalletRepository {
 	return &WalletRepository{db: db}
 }
 
-func (r *WalletRepository) FindWalletForUpdate(ctx context.Context, tx pgx.Tx, playerID uuid.UUID, currencyStr string) (*domain.Wallet, error) {
+func (r *WalletRepository) FindWalletForUpdate(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Wallet, error) {
 	query := `SELECT id, player_id, currency, balance, version, created_at, updated_at 
               FROM wallets 
-              WHERE player_id = $1 AND currency = $2 
+              WHERE id = $1 
               FOR UPDATE`
 	
-	var id, pID uuid.UUID
+	var fetchedID, pID uuid.UUID
 	var curStr string
 	var balanceUnits int64
 	var version int64
 	var createdAt, updatedAt time.Time
 
-	err := tx.QueryRow(ctx, query, playerID, currencyStr).Scan(
-		&id, &pID, &curStr, &balanceUnits, &version, &createdAt, &updatedAt,
+	err := tx.QueryRow(ctx, query, id).Scan(
+		&fetchedID, &pID, &curStr, &balanceUnits, &version, &createdAt, &updatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -46,7 +46,7 @@ func (r *WalletRepository) FindWalletForUpdate(ctx context.Context, tx pgx.Tx, p
 	currency, _ := domain.ParseCurrency(curStr)
 	balanceMoney, _ := domain.MoneyFromUnits(balanceUnits, currency)
 
-	w, err := domain.RehydrateWallet(id, pID, balanceMoney, version, createdAt, updatedAt)
+	w, err := domain.RehydrateWallet(fetchedID, pID, balanceMoney, version, createdAt, updatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to rehydrate wallet: %w", err)
 	}

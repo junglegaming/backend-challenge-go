@@ -2,6 +2,8 @@ package usecases
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -22,12 +24,10 @@ func NewPendingReferenceUseCase(txManager TransactionManager, repo WalletReposit
 	}
 }
 
-// ProcessBatch finds pending transactions and tries to process them or reject them if timed out.
 func (uc *PendingReferenceUseCase) ProcessBatch(ctx context.Context, batchSize int, timeout time.Duration) (int, error) {
 	var processedCount int
 
 	err := uc.txManager.RunInTransaction(ctx, func(ctx context.Context, tx pgx.Tx) error {
-		// We need a method in repo to fetch pending reference tx IDs
 		txIDs, err := uc.repo.GetPendingReferenceTxIDsInTx(ctx, tx, batchSize)
 		if err != nil {
 			return err
@@ -36,29 +36,46 @@ func (uc *PendingReferenceUseCase) ProcessBatch(ctx context.Context, batchSize i
 		now := time.Now().UTC()
 
 		for _, txID := range txIDs {
-			// Find the transaction
 			wagerTx, err := uc.repo.FindTransactionByIDInTx(ctx, tx, txID)
 			if err != nil || wagerTx == nil {
 				continue
 			}
 
-			// If it's already older than 10 minutes, reject it
+			req := wagerTx.Request()
+
+			createMeta := func() domain.EventMeta {
+				evID, _ := uuid.NewV7()
+				corrID := req.IdempotencyKey
+				if corrID == "" {
+					corrID = wagerTx.ID().String()
+				}
+				return domain.EventMeta{
+					EventID:       evID,
+					CorrelationID: corrID,
+					CausationID:   wagerTx.ID().String(),
+					OccurredAt:    now,
+				}
+			}
+
+			publishRejected := func(code domain.FailureCode, bal domain.Money) error {
+				if err := wagerTx.MarkRejected(code, bal, now); err != nil {
+					return err
+				}
+				if err := uc.repo.UpdateWagerTransactionStatus(ctx, tx, wagerTx.ID(), wagerTx.Status(), wagerTx.FailureCode()); err != nil {
+					return err
+				}
+				ev, _ := domain.NewWagerTransactionRejected(createMeta(), wagerTx)
+				return uc.repo.InsertOutboxEvent(ctx, tx, ev.EventType, ev)
+			}
+
 			if now.Sub(wagerTx.CreatedAt()) > timeout {
-				wagerTx.MarkRejected(domain.FailureReferenceNotFound, domain.Money{}, now)
-				uc.repo.UpdateWagerTransactionStatus(ctx, tx, wagerTx.ID(), wagerTx.Status(), domain.FailureReferenceNotFound)
-				uc.repo.InsertOutboxEvent(ctx, tx, "WagerTransactionRejected", wagerTx)
+				_ = publishRejected(domain.FailureReferenceNotFound, domain.Money{})
 				processedCount++
 				continue
 			}
 
-			// Try to find the reference
-			refTx, err := uc.repo.FindTransactionByExternalIDInTx(ctx, tx, wagerTx.Request().ProviderID, wagerTx.Request().ReferenceExternalTransactionID)
-			if err != nil {
-				continue
-			}
-
-			if refTx == nil {
-				// Still not found, skip
+			refTx, err := uc.repo.FindTransactionByExternalIDInTx(ctx, tx, req.ProviderID, req.ReferenceExternalTransactionID)
+			if err != nil || refTx == nil {
 				continue
 			}
 
@@ -68,38 +85,44 @@ func (uc *PendingReferenceUseCase) ProcessBatch(ctx context.Context, batchSize i
 			case domain.ReferenceWait:
 				continue
 			case domain.ReferenceRejected:
-				wagerTx.MarkRejected(failureCode, domain.Money{}, now)
-				uc.repo.UpdateWagerTransactionStatus(ctx, tx, wagerTx.ID(), wagerTx.Status(), failureCode)
+				_ = publishRejected(failureCode, domain.Money{})
 				processedCount++
 				continue
 			case domain.ReferenceAccepted:
-				// Ensure no double reversal
 				if domain.IsReversal(wagerTx.Kind()) {
-					hasReversal, err := uc.repo.HasProcessedReversalInTx(ctx, tx, wagerTx.Request().ProviderID, wagerTx.Request().ReferenceExternalTransactionID)
+					hasReversal, err := uc.repo.HasProcessedReversalInTx(ctx, tx, req.ProviderID, req.ReferenceExternalTransactionID)
 					if err != nil {
 						continue
 					}
 					if hasReversal {
-						wagerTx.MarkRejected(domain.FailureAlreadyReversed, domain.Money{}, now)
-						uc.repo.UpdateWagerTransactionStatus(ctx, tx, wagerTx.ID(), wagerTx.Status(), domain.FailureAlreadyReversed)
+						_ = publishRejected(domain.FailureAlreadyReversed, domain.Money{})
 						processedCount++
 						continue
 					}
 				}
 
-				// Time to process the transaction!
-				wallet, err := uc.repo.FindWalletForUpdate(ctx, tx, wagerTx.PlayerID(), string(wagerTx.Money().Currency()))
+				wallet, err := uc.repo.FindWalletForUpdate(ctx, tx, req.WalletID)
 				if err != nil {
 					continue
 				}
 				if wallet == nil {
-					wagerTx.MarkRejected(domain.FailureInternal, domain.Money{}, now)
-					uc.repo.UpdateWagerTransactionStatus(ctx, tx, wagerTx.ID(), wagerTx.Status(), domain.FailureInternal)
+					_ = publishRejected(domain.FailureInternal, domain.Money{})
 					processedCount++
 					continue
 				}
 
-				req := wagerTx.Request()
+				if wallet.PlayerID() != req.PlayerID {
+					_ = publishRejected(domain.FailurePlayerWalletMismatch, wallet.Balance())
+					processedCount++
+					continue
+				}
+
+				if wallet.Currency() != req.Money.Currency() {
+					_ = publishRejected(domain.FailureCurrencyMismatch, wallet.Balance())
+					processedCount++
+					continue
+				}
+
 				var movement domain.Movement
 				var applyErr error
 
@@ -111,33 +134,54 @@ func (uc *PendingReferenceUseCase) ProcessBatch(ctx context.Context, batchSize i
 				case domain.KindLoss:
 					applyErr = nil
 				case domain.KindRollback:
-					movement, applyErr = wallet.Credit(req.Money, now)
+					if refTx != nil {
+						switch refTx.Kind() {
+						case domain.KindBet:
+							movement, applyErr = wallet.Credit(req.Money, now)
+						case domain.KindWin, domain.KindRefund:
+							movement, applyErr = wallet.Debit(req.Money, now)
+						case domain.KindLoss:
+							applyErr = nil
+						default:
+							applyErr = fmt.Errorf("cannot rollback kind: %s", refTx.Kind())
+						}
+					} else {
+						applyErr = fmt.Errorf("rollback requires reference tx")
+					}
+				default:
+					applyErr = fmt.Errorf("unsupported kind: %s", req.Kind)
 				}
 
 				if applyErr != nil {
-					if errorsIsInsufficientFunds(applyErr) {
-						wagerTx.MarkRejected(domain.FailureInsufficientFunds, wallet.Balance(), now)
-						uc.repo.UpdateWagerTransactionStatus(ctx, tx, wagerTx.ID(), wagerTx.Status(), domain.FailureInsufficientFunds)
-						uc.repo.InsertOutboxEvent(ctx, tx, "WagerTransactionRejected", wagerTx)
+					if errors.Is(applyErr, domain.ErrInsufficientFunds) {
+						_ = publishRejected(domain.FailureInsufficientFunds, wallet.Balance())
 						processedCount++
-						continue
 					}
 					continue
 				}
 
-				if req.Kind != domain.KindLoss {
-					wagerTx.MarkProcessed(wallet.Balance(), refTx.ID(), now)
+				resolvedRefID := refTx.ID()
+
+				if req.Kind != domain.KindLoss && !(req.Kind == domain.KindRollback && refTx != nil && refTx.Kind() == domain.KindLoss) {
+					if err := wagerTx.MarkProcessed(wallet.Balance(), resolvedRefID, now); err != nil {
+						continue
+					}
 					if err := uc.repo.UpdateWalletBalance(ctx, tx, wallet); err != nil {
 						continue
 					}
 					entryID, _ := uuid.NewV7()
-					uc.repo.InsertLedgerEntry(ctx, tx, entryID, wallet.ID(), wagerTx.ID(), movement)
+					_ = uc.repo.InsertLedgerEntry(ctx, tx, entryID, wallet.ID(), wagerTx.ID(), movement)
+					balEvent, _ := domain.NewWalletBalanceChanged(createMeta(), wallet.ID(), wagerTx.ID(), movement)
+					_ = uc.repo.InsertOutboxEvent(ctx, tx, balEvent.EventType, balEvent)
 				} else {
-					wagerTx.MarkProcessed(wallet.Balance(), refTx.ID(), now)
+					if err := wagerTx.MarkProcessed(wallet.Balance(), resolvedRefID, now); err != nil {
+						continue
+					}
 				}
 
-				uc.repo.UpdateWagerTransactionStatus(ctx, tx, wagerTx.ID(), wagerTx.Status(), "")
-				uc.repo.InsertOutboxEvent(ctx, tx, "WagerTransactionProcessed", wagerTx)
+				_ = uc.repo.UpdateWagerTransactionProcessed(ctx, tx, wagerTx)
+				ev, _ := domain.NewWagerTransactionProcessed(createMeta(), wagerTx)
+				_ = uc.repo.InsertOutboxEvent(ctx, tx, ev.EventType, ev)
 				processedCount++
 			}
 		}
