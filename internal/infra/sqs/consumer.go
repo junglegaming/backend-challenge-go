@@ -32,7 +32,7 @@ type Consumer struct {
 	usecase  *usecases.ProcessTransactionUseCase
 }
 
-func NewConsumer(lc fx.Lifecycle, cfg SQSConfig, uc *usecases.ProcessTransactionUseCase) (*Consumer, error) {
+func NewClient(cfg SQSConfig) (*sqs.Client, error) {
 	ctx := context.Background()
 
 	customResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
@@ -55,8 +55,10 @@ func NewConsumer(lc fx.Lifecycle, cfg SQSConfig, uc *usecases.ProcessTransaction
 		return nil, fmt.Errorf("unable to load SDK config: %w", err)
 	}
 
-	client := sqs.NewFromConfig(awsCfg)
+	return sqs.NewFromConfig(awsCfg), nil
+}
 
+func NewConsumer(lc fx.Lifecycle, cfg SQSConfig, client *sqs.Client, uc *usecases.ProcessTransactionUseCase) (*Consumer, error) {
 	consumer := &Consumer{
 		client:   client,
 		queueURL: cfg.QueueURL,

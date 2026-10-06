@@ -12,6 +12,7 @@ import (
 	"github.com/Lzdevmendes/backend-challenge-go/internal/infra/db"
 	infrahttp "github.com/Lzdevmendes/backend-challenge-go/internal/infra/http"
 	"github.com/Lzdevmendes/backend-challenge-go/internal/infra/sqs"
+	"github.com/Lzdevmendes/backend-challenge-go/internal/infra/workers"
 )
 
 func main() {
@@ -80,8 +81,14 @@ func main() {
 				}
 			},
 
+			// Provide SQS Client
+			sqs.NewClient,
+
 			// SQS Consumer
 			sqs.NewConsumer,
+
+			// Background Workers
+			workers.NewOutboxWorker,
 
 			// Auth
 			func(lc fx.Lifecycle) (*infrahttp.AuthMiddleware, error) {
@@ -97,8 +104,8 @@ func main() {
 			infrahttp.NewServer,
 		),
 		fx.Invoke(
-			// Start HTTP Server
-			func(srv *http.Server, consumer *sqs.Consumer) {
+			// Start HTTP Server, Consumer, and Workers
+			func(srv *http.Server, consumer *sqs.Consumer, outboxWorker *workers.OutboxWorker) {
 				fmt.Printf("Starting HTTP Server on %s\n", srv.Addr)
 			},
 		),
