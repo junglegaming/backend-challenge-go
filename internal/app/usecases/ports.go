@@ -22,6 +22,10 @@ type WalletRepository interface {
 	InsertOutboxEvent(ctx context.Context, tx pgx.Tx, eventType string, payload any) error
 	CheckIdempotency(ctx context.Context, tx pgx.Tx, providerID, externalTxID string) (*domain.WagerTransaction, error)
 	InsertInboxMessage(ctx context.Context, tx pgx.Tx, consumerName, messageID string) (bool, error)
+	FindTransactionByExternalIDInTx(ctx context.Context, tx pgx.Tx, providerID, externalTxID string) (*domain.WagerTransaction, error)
+	HasProcessedReversalInTx(ctx context.Context, tx pgx.Tx, providerID, referenceExtID string) (bool, error)
+	GetPendingReferenceTxIDsInTx(ctx context.Context, tx pgx.Tx, limit int) ([]uuid.UUID, error)
+	FindTransactionByIDInTx(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.WagerTransaction, error)
 
 	// Queries
 	FindWalletByID(ctx context.Context, id uuid.UUID) (*domain.Wallet, error)

@@ -273,3 +273,165 @@ func (r *WalletRepository) InsertInboxMessage(ctx context.Context, tx pgx.Tx, co
 	}
 	return tag.RowsAffected() > 0, nil
 }
+
+func (r *WalletRepository) FindTransactionByExternalIDInTx(ctx context.Context, tx pgx.Tx, providerID, externalTxID string) (*domain.WagerTransaction, error) {
+	query := `SELECT id, provider_id, external_transaction_id, player_id, wallet_id,
+              round_id, game_id, kind, amount, currency, reference_external_transaction_id,
+              status, failure_code, idempotency_key, payload_hash, created_at
+              FROM wager_transactions
+              WHERE provider_id = $1 AND external_transaction_id = $2 LIMIT 1`
+
+	row := tx.QueryRow(ctx, query, providerID, externalTxID)
+
+	var id, walletID, playerID uuid.UUID
+	var req domain.ExternalRequest
+	var amount int64
+	var currency, status, failureCodeStr, payloadHash string
+	var createdAt time.Time
+	var refID *string
+	var roundID, gameID *string
+	var kind string
+
+	err := row.Scan(&id, &req.ProviderID, &req.ExternalTransactionID, &playerID, &walletID,
+		&roundID, &gameID, &kind, &amount, &currency, &refID,
+		&status, &failureCodeStr, &req.IdempotencyKey, &payloadHash, &createdAt)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	req.PlayerID = playerID
+	req.WalletID = walletID
+	if roundID != nil {
+		req.RoundID = *roundID
+	}
+	if gameID != nil {
+		req.GameID = *gameID
+	}
+	req.Kind = domain.Kind(kind)
+	money, _ := domain.MoneyFromUnits(amount, domain.Currency(currency))
+	req.Money = money
+	if refID != nil {
+		req.ReferenceExternalTransactionID = *refID
+	}
+
+	snap := domain.TransactionSnapshot{
+		ID:          id,
+		Origin:      domain.OriginExternal,
+		Request:     req,
+		PayloadHash: payloadHash,
+		WalletID:    walletID,
+		PlayerID:    playerID,
+		Kind:        req.Kind,
+		Money:       req.Money,
+		Status:      domain.Status(status),
+		FailureCode: domain.FailureCode(failureCodeStr),
+		CreatedAt:   createdAt,
+		UpdatedAt:   createdAt,
+	}
+
+	return domain.RehydrateTransaction(snap)
+}
+
+func (r *WalletRepository) HasProcessedReversalInTx(ctx context.Context, tx pgx.Tx, providerID, referenceExtID string) (bool, error) {
+	query := `SELECT 1 FROM wager_transactions 
+              WHERE provider_id = $1 AND reference_external_transaction_id = $2 
+              AND kind IN ('REFUND', 'ROLLBACK') 
+              AND status = 'PROCESSED' LIMIT 1`
+	var exists int
+	err := tx.QueryRow(ctx, query, providerID, referenceExtID).Scan(&exists)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+func (r *WalletRepository) GetPendingReferenceTxIDsInTx(ctx context.Context, tx pgx.Tx, limit int) ([]uuid.UUID, error) {
+	query := `SELECT id FROM wager_transactions 
+              WHERE status = 'PENDING_REFERENCE' 
+              ORDER BY created_at ASC 
+              FOR UPDATE SKIP LOCKED LIMIT $1`
+	rows, err := tx.Query(ctx, query, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ids []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+func (r *WalletRepository) FindTransactionByIDInTx(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.WagerTransaction, error) {
+	query := `SELECT id, provider_id, external_transaction_id, player_id, wallet_id,
+              round_id, game_id, kind, amount, currency, reference_external_transaction_id,
+              status, failure_code, idempotency_key, payload_hash, created_at
+              FROM wager_transactions
+              WHERE id = $1 LIMIT 1`
+
+	row := tx.QueryRow(ctx, query, id)
+
+	var walletID, playerID uuid.UUID
+	var req domain.ExternalRequest
+	var amount int64
+	var currency, status, failureCodeStr, payloadHash string
+	var createdAt time.Time
+	var refID *string
+	var roundID, gameID *string
+	var kind string
+
+	err := row.Scan(&id, &req.ProviderID, &req.ExternalTransactionID, &playerID, &walletID,
+		&roundID, &gameID, &kind, &amount, &currency, &refID,
+		&status, &failureCodeStr, &req.IdempotencyKey, &payloadHash, &createdAt)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	req.PlayerID = playerID
+	req.WalletID = walletID
+	if roundID != nil {
+		req.RoundID = *roundID
+	}
+	if gameID != nil {
+		req.GameID = *gameID
+	}
+	req.Kind = domain.Kind(kind)
+	money, _ := domain.MoneyFromUnits(amount, domain.Currency(currency))
+	req.Money = money
+	if refID != nil {
+		req.ReferenceExternalTransactionID = *refID
+	}
+
+	snap := domain.TransactionSnapshot{
+		ID:          id,
+		Origin:      domain.OriginExternal,
+		Request:     req,
+		PayloadHash: payloadHash,
+		WalletID:    walletID,
+		PlayerID:    playerID,
+		Kind:        req.Kind,
+		Money:       req.Money,
+		Status:      domain.Status(status),
+		FailureCode: domain.FailureCode(failureCodeStr),
+		CreatedAt:   createdAt,
+		UpdatedAt:   createdAt,
+	}
+
+	return domain.RehydrateTransaction(snap)
+}

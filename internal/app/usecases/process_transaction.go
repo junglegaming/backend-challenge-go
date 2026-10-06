@@ -71,6 +71,65 @@ func (uc *ProcessTransactionUseCase) Execute(ctx context.Context, req domain.Ext
 			return err
 		}
 
+		// 2. Reference Checking (if applicable)
+		if req.ReferenceExternalTransactionID != "" {
+			refTx, err := uc.repo.FindTransactionByExternalIDInTx(ctx, tx, req.ProviderID, req.ReferenceExternalTransactionID)
+			if err != nil {
+				return err
+			}
+
+			if refTx == nil {
+				if err := wagerTx.MarkPendingReference(now); err != nil {
+					return err
+				}
+				if err := uc.repo.InsertWagerTransaction(ctx, tx, wagerTx); err != nil {
+					return err
+				}
+				finalTx = wagerTx
+				return nil // It's pending, return cleanly (will be polled by pending_worker)
+			}
+
+			decision, failureCode := domain.EvaluateReference(wagerTx, refTx)
+			switch decision {
+			case domain.ReferenceWait:
+				if err := wagerTx.MarkPendingReference(now); err != nil {
+					return err
+				}
+				if err := uc.repo.InsertWagerTransaction(ctx, tx, wagerTx); err != nil {
+					return err
+				}
+				finalTx = wagerTx
+				return nil
+			case domain.ReferenceRejected:
+				if err := wagerTx.MarkRejected(failureCode, domain.Money{}, now); err != nil {
+					return err
+				}
+				if err := uc.repo.InsertWagerTransaction(ctx, tx, wagerTx); err != nil {
+					return err
+				}
+				finalTx = wagerTx
+				return nil
+			case domain.ReferenceAccepted:
+				// Ensure no double reversal
+				if domain.IsReversal(wagerTx.Kind()) {
+					hasReversal, err := uc.repo.HasProcessedReversalInTx(ctx, tx, req.ProviderID, req.ReferenceExternalTransactionID)
+					if err != nil {
+						return err
+					}
+					if hasReversal {
+						if err := wagerTx.MarkRejected(domain.FailureAlreadyReversed, domain.Money{}, now); err != nil {
+							return err
+						}
+						if err := uc.repo.InsertWagerTransaction(ctx, tx, wagerTx); err != nil {
+							return err
+						}
+						finalTx = wagerTx
+						return nil
+					}
+				}
+			}
+		}
+
 		// Insert early so we can refer to it
 		if err := uc.repo.InsertWagerTransaction(ctx, tx, wagerTx); err != nil {
 			return err

@@ -62,6 +62,7 @@ func main() {
 			usecases.NewCreateWalletUseCase,
 			usecases.NewProcessTransactionUseCase,
 			usecases.NewQueryUseCase,
+			usecases.NewPendingReferenceUseCase,
 
 			// SQS Config
 			func() sqs.SQSConfig {
@@ -89,6 +90,7 @@ func main() {
 
 			// Background Workers
 			workers.NewOutboxWorker,
+			workers.NewPendingReferenceWorker,
 
 			// Auth
 			func(lc fx.Lifecycle) (*infrahttp.AuthMiddleware, error) {
@@ -105,7 +107,7 @@ func main() {
 		),
 		fx.Invoke(
 			// Start HTTP Server, Consumer, and Workers
-			func(srv *http.Server, consumer *sqs.Consumer, outboxWorker *workers.OutboxWorker) {
+			func(srv *http.Server, consumer *sqs.Consumer, outboxWorker *workers.OutboxWorker, pendingWorker *workers.PendingReferenceWorker) {
 				fmt.Printf("Starting HTTP Server on %s\n", srv.Addr)
 			},
 		),
