@@ -260,3 +260,16 @@ func (r *WalletRepository) CheckIdempotency(ctx context.Context, tx pgx.Tx, prov
 
 	return domain.RehydrateTransaction(snap)
 }
+
+func (r *WalletRepository) InsertInboxMessage(ctx context.Context, tx pgx.Tx, consumerName, messageID string) (bool, error) {
+	query := `
+		INSERT INTO inbox_messages (consumer_name, message_id, created_at)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (consumer_name, message_id) DO NOTHING
+	`
+	tag, err := tx.Exec(ctx, query, consumerName, messageID, time.Now().UTC())
+	if err != nil {
+		return false, fmt.Errorf("failed to insert inbox message: %w", err)
+	}
+	return tag.RowsAffected() > 0, nil
+}

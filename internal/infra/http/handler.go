@@ -137,7 +137,7 @@ func (h *Handler) ProcessTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// For idempotency check we must pass the same req to the usecase
-	tx, err := h.processTxUC.Execute(r.Context(), req)
+	tx, err := h.processTxUC.Execute(r.Context(), req, "", "")
 	if err != nil {
 		if errors.Is(err, domain.ErrInvalidArgument) || errors.Is(err, domain.ErrInvalidAmount) || errors.Is(err, domain.ErrCurrencyMismatch) {
 			http.Error(w, err.Error(), http.StatusConflict) // Using conflict for validation / idempotency conflicts to match idempotent design logic

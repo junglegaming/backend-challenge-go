@@ -25,10 +25,23 @@ func NewProcessTransactionUseCase(txManager TransactionManager, repo WalletRepos
 }
 
 // Execute processes a wager transaction idempotently.
-func (uc *ProcessTransactionUseCase) Execute(ctx context.Context, req domain.ExternalRequest) (*domain.WagerTransaction, error) {
+// Optional consumerName and messageID for SQS deduplication inside the same transaction.
+func (uc *ProcessTransactionUseCase) Execute(ctx context.Context, req domain.ExternalRequest, consumerName, messageID string) (*domain.WagerTransaction, error) {
 	var finalTx *domain.WagerTransaction
 
 	err := uc.txManager.RunInTransaction(ctx, func(ctx context.Context, tx pgx.Tx) error {
+		// 0. Check inbox deduplication if coming from SQS
+		if messageID != "" && consumerName != "" {
+			inserted, err := uc.repo.InsertInboxMessage(ctx, tx, consumerName, messageID)
+			if err != nil {
+				return err
+			}
+			if !inserted {
+				// Message was already processed by this consumer
+				return nil
+			}
+		}
+
 		// 1. Idempotency Check
 		existingTx, err := uc.repo.CheckIdempotency(ctx, tx, req.ProviderID, req.ExternalTransactionID)
 		if err != nil {

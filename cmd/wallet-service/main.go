@@ -11,6 +11,7 @@ import (
 	"github.com/Lzdevmendes/backend-challenge-go/internal/app/usecases"
 	"github.com/Lzdevmendes/backend-challenge-go/internal/infra/db"
 	infrahttp "github.com/Lzdevmendes/backend-challenge-go/internal/infra/http"
+	"github.com/Lzdevmendes/backend-challenge-go/internal/infra/sqs"
 )
 
 func main() {
@@ -61,6 +62,27 @@ func main() {
 			usecases.NewProcessTransactionUseCase,
 			usecases.NewQueryUseCase,
 
+			// SQS Config
+			func() sqs.SQSConfig {
+				queueURL := os.Getenv("SQS_QUEUE_URL")
+				if queueURL == "" {
+					queueURL = "http://localhost:4566/000000000000/wager-transactions.fifo"
+				}
+				endpoint := os.Getenv("SQS_ENDPOINT")
+				if endpoint == "" {
+					endpoint = "http://localhost:4566"
+				}
+				return sqs.SQSConfig{
+					QueueURL:   queueURL,
+					Region:     "us-east-1",
+					Endpoint:   endpoint,
+					MaxRetries: 3,
+				}
+			},
+
+			// SQS Consumer
+			sqs.NewConsumer,
+
 			// Auth
 			func(lc fx.Lifecycle) (*infrahttp.AuthMiddleware, error) {
 				ctx := context.Background()
@@ -76,7 +98,7 @@ func main() {
 		),
 		fx.Invoke(
 			// Start HTTP Server
-			func(srv *http.Server) {
+			func(srv *http.Server, consumer *sqs.Consumer) {
 				fmt.Printf("Starting HTTP Server on %s\n", srv.Addr)
 			},
 		),
