@@ -42,8 +42,9 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 }
 
 type CreateWalletRequest struct {
-	PlayerID string `json:"playerId"`
-	Currency string `json:"currency"`
+	PlayerID       string `json:"playerId"`
+	Currency       string `json:"currency"`
+	InitialBalance string `json:"initialBalance"`
 }
 
 func (h *Handler) CreateWallet(w http.ResponseWriter, r *http.Request) {
@@ -60,8 +61,9 @@ func (h *Handler) CreateWallet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cmd := usecases.CreateWalletCommand{
-		PlayerID: playerID,
-		Currency: req.Currency,
+		PlayerID:       playerID,
+		Currency:       req.Currency,
+		InitialBalance: req.InitialBalance,
 	}
 
 	wallet, err := h.createWallUC.Execute(r.Context(), cmd)
@@ -71,10 +73,11 @@ func (h *Handler) CreateWallet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{
+	json.NewEncoder(w).Encode(map[string]interface{}{
 		"id":       wallet.ID().String(),
 		"playerId": wallet.PlayerID().String(),
 		"currency": string(wallet.Currency()),
+		"balance":  wallet.Balance().Units(),
 	})
 }
 
