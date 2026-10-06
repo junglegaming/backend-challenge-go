@@ -26,15 +26,14 @@ type AuthMiddleware struct {
 
 func NewAuthMiddleware(ctx context.Context, issuerURL string) (*AuthMiddleware, error) {
 	if issuerURL == "" {
-		// Mock verifier for testing without keycloak
-		return &AuthMiddleware{verifier: nil}, nil
+		return nil, fmt.Errorf("KEYCLOAK_ISSUER_URL is required for strict OIDC validation")
 	}
 
 	provider, err := oidc.NewProvider(ctx, issuerURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init oidc provider: %w", err)
 	}
-	// We skip client ID check because it's an API that accepts multiple clients
+
 	verifier := provider.Verifier(&oidc.Config{SkipClientIDCheck: true})
 	return &AuthMiddleware{verifier: verifier}, nil
 }
@@ -49,42 +48,37 @@ func (m *AuthMiddleware) RequireRole(role string, next http.HandlerFunc) http.Ha
 
 		rawToken := strings.TrimPrefix(authHeader, "Bearer ")
 
-		var providerID string
-		var roles []string
+		token, err := m.verifier.Verify(r.Context(), rawToken)
+		if err != nil {
+			http.Error(w, "invalid token", http.StatusUnauthorized)
+			return
+		}
 
-		if m.verifier == nil {
-			// Mock logic if no verifier is provided (e.g. testing)
-			// Assuming token is "mock-token:{role}:{providerId}"
-			parts := strings.Split(rawToken, ":")
-			if len(parts) >= 3 && parts[0] == "mock-token" {
-				roles = append(roles, parts[1])
-				providerID = parts[2]
-			}
-		} else {
-			token, err := m.verifier.Verify(r.Context(), rawToken)
-			if err != nil {
-				http.Error(w, "invalid token", http.StatusUnauthorized)
-				return
-			}
+		var claims struct {
+			RealmAccess struct {
+				Roles []string `json:"roles"`
+			} `json:"realm_access"`
+			ClientID string `json:"clientId"`
+			Azp      string `json:"azp"`
+		}
 
-			var claims struct {
-				RealmAccess struct {
-					Roles []string `json:"roles"`
-				} `json:"realm_access"`
-				ClientID string `json:"clientId"` // Keycloak standard for client_credentials
-			}
+		if err := token.Claims(&claims); err != nil {
+			http.Error(w, "failed to parse claims", http.StatusUnauthorized)
+			return
+		}
 
-			if err := token.Claims(&claims); err != nil {
-				http.Error(w, "failed to parse claims", http.StatusUnauthorized)
-				return
-			}
+		providerID := claims.ClientID
+		if providerID == "" {
+			providerID = claims.Azp
+		}
 
-			roles = claims.RealmAccess.Roles
-			providerID = claims.ClientID
+		if providerID == "" {
+			http.Error(w, "missing client identification in token", http.StatusUnauthorized)
+			return
 		}
 
 		hasRole := false
-		for _, r := range roles {
+		for _, r := range claims.RealmAccess.Roles {
 			if r == role {
 				hasRole = true
 				break
