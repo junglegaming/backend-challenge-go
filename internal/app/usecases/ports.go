@@ -21,4 +21,11 @@ type WalletRepository interface {
 	InsertLedgerEntry(ctx context.Context, tx pgx.Tx, entryID, walletID, transactionID uuid.UUID, movement domain.Movement) error
 	InsertOutboxEvent(ctx context.Context, tx pgx.Tx, eventType string, payload any) error
 	CheckIdempotency(ctx context.Context, tx pgx.Tx, providerID, externalTxID string) (*domain.WagerTransaction, error)
+
+	// Queries
+	FindWalletByID(ctx context.Context, id uuid.UUID) (*domain.Wallet, error)
+	FindTransactionByID(ctx context.Context, id uuid.UUID) (*domain.WagerTransaction, error)
+	FindTransactionByExternalID(ctx context.Context, providerID, externalTxID string) (*domain.WagerTransaction, error)
+	GetLedger(ctx context.Context, walletID uuid.UUID, cursor string, limit int) ([]domain.Movement, string, error)
+	ReconcileWallet(ctx context.Context, walletID uuid.UUID) (domain.Money, domain.Money, int, error)
 }

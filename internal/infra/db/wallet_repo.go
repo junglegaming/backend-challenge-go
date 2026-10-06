@@ -9,14 +9,17 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Lzdevmendes/backend-challenge-go/internal/domain"
 )
 
-type WalletRepository struct{}
+type WalletRepository struct {
+	pool *pgxpool.Pool
+}
 
-func NewWalletRepository() *WalletRepository {
-	return &WalletRepository{}
+func NewWalletRepository(db *PostgresDB) *WalletRepository {
+	return &WalletRepository{pool: db.Pool}
 }
 
 // FindWalletForUpdate fetches a wallet and locks the row to prevent concurrent modifications (lost updates).

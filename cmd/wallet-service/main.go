@@ -44,8 +44,8 @@ func main() {
 			},
 
 			// Repositories
-			func() *db.WalletRepository {
-				return db.NewWalletRepository()
+			func(postgresDB *db.PostgresDB) *db.WalletRepository {
+				return db.NewWalletRepository(postgresDB)
 			},
 
 			// Provide TransactionManager and WalletRepository interfaces
@@ -59,6 +59,14 @@ func main() {
 			// UseCases
 			usecases.NewCreateWalletUseCase,
 			usecases.NewProcessTransactionUseCase,
+			usecases.NewQueryUseCase,
+
+			// Auth
+			func(lc fx.Lifecycle) (*infrahttp.AuthMiddleware, error) {
+				ctx := context.Background()
+				issuerURL := os.Getenv("KEYCLOAK_ISSUER_URL") // e.g. "http://localhost:8180/realms/wallet-realm"
+				return infrahttp.NewAuthMiddleware(ctx, issuerURL)
+			},
 
 			// HTTP Handler
 			infrahttp.NewHandler,
