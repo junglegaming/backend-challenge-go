@@ -100,12 +100,12 @@ func (w *OutboxWorker) processBatch() {
 			MessageGroupId:         aws.String(e.EventType),
 			MessageDeduplicationId: aws.String(e.ID),
 		})
-		
+
 		if err != nil {
 			log.Printf("failed to publish outbox event %s: %v", e.ID, err)
 			continue // Proceed to next event. The failed one will be retried on next loop.
 		}
-		
+
 		processedIDs = append(processedIDs, e.ID)
 	}
 

@@ -41,7 +41,7 @@ func TestConcurrencyWalletBetting(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.NotNil(t, wallet)
-	
+
 	// Fund the wallet with 100.00
 	fundMoney, _ := domain.ParseMoney("100.00", "BRL")
 	fundReq := domain.ExternalRequest{
@@ -85,7 +85,7 @@ func TestConcurrencyWalletBetting(t *testing.T) {
 				IdempotencyKey:        uuid.NewString(),
 			}
 
-			// Add a tiny sleep to increase chance of race condition 
+			// Add a tiny sleep to increase chance of race condition
 			// (if locking wasn't working)
 			time.Sleep(10 * time.Millisecond)
 
