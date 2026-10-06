@@ -1,0 +1,67 @@
+{
+  "id": "wallet-realm",
+  "realm": "wallet-realm",
+  "enabled": true,
+  "roles": {
+    "realm": [
+      {
+        "name": "wager-provider"
+      },
+      {
+        "name": "wallet-admin"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "provider-a",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "provider-a-secret",
+      "serviceAccountsEnabled": true,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "fullScopeAllowed": true
+    },
+    {
+      "clientId": "provider-b",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "provider-b-secret",
+      "serviceAccountsEnabled": true,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "fullScopeAllowed": true
+    },
+    {
+      "clientId": "admin-cli",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "admin-secret",
+      "serviceAccountsEnabled": true,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "fullScopeAllowed": true
+    }
+  ],
+  "users": [
+    {
+      "username": "service-account-provider-a",
+      "enabled": true,
+      "serviceAccountClientId": "provider-a",
+      "realmRoles": ["wager-provider"]
+    },
+    {
+      "username": "service-account-provider-b",
+      "enabled": true,
+      "serviceAccountClientId": "provider-b",
+      "realmRoles": ["wager-provider"]
+    },
+    {
+      "username": "service-account-admin-cli",
+      "enabled": true,
+      "serviceAccountClientId": "admin-cli",
+      "realmRoles": ["wallet-admin"]
+    }
+  ]
+}
