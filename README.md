@@ -25,7 +25,7 @@ Este repositório contém a implementação do serviço distribuído de carteira
 
 3. Geração do Token OIDC (Keycloak admin):
    ```bash
-   curl -X POST http://localhost:8180/realms/wallet/protocol/openid-connect/token \
+   curl -X POST http://localhost:8180/realms/wallet-realm/protocol/openid-connect/token \
      -d "client_id=wallet-api" \
      -d "client_secret=secret" \
      -d "grant_type=client_credentials"
