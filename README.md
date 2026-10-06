@@ -1,35 +1,43 @@
-# Wallet Service (Distributed Betting System)
+# Wallet & Wagering Backend Challenge (Go)
 
-Serviço de processamento financeiro distribuído, desenvolvido em **Go 1.22+**, para provedores de jogos de azar e apostas esportivas, suportando alta simultaneidade sem _lost updates_ e escalando horizontalmente sem _floating point errors_ ou dados inconsistentes.
+Este repositório contém a implementação do serviço distribuído de carteiras e apostas. Ele provê alta consistência (ACID), isolamento de concorrência, idempotência persistente (com zero float handling), comunicação outbox/SQS para tolerância a falhas, e Autenticação OIDC via Keycloak.
 
-## Principais Funcionalidades
-- **Concorrência Segura**: Lock pessimista no Postgres (`FOR UPDATE`).
-- **Idempotência Durável**: Proteção contra replays no banco e filas SQS.
-- **Precisão Financeira Total**: Representação em `int64` puro; ausência total de _Ponto Flutuante_.
-- **Autenticação Segura (OIDC)**: Integração Multitenant usando Keycloak e `client_credentials`.
-- **Mensageria com Outbox Pattern**: Transações salvam eventos de forma atômica para o `outbox_events`, que são processados por workers e publicados no **AWS SQS** em _at-least-once delivery_.
-- **Uber Fx**: Inicialização elegante e graciosa do HTTP Server, SQS Consumer e Workers.
+## Tecnologias e Padrões Utilizados
+- **Go 1.22+**, Go Modules, Uber Fx
+- **PostgreSQL 16** via `pgxpool` (uso de `pgx.Tx` explícito)
+- **AWS SQS** (LocalStack) 
+- **Keycloak** (OIDC - `client_credentials`)
+- **Docker & Docker Compose** (Ecossistema local rodando 3 instâncias)
+- **Prometheus** (Métricas customizadas exportadas em `/metrics`)
 
-## Subindo o Projeto
+## Executando o Projeto
 
-A aplicação depende de PostgreSQL, LocalStack (SQS), e Keycloak, já mapeados no `docker-compose.yml`.
+1. Inicie o ecossistema (PostgreSQL, LocalStack, Keycloak e a aplicação):
+   ```bash
+   docker-compose up --build -d
+   ```
+   > Esse comando irá subir o banco de dados, aplicar as migrations (via o container `migrate`), instanciar filas no SQS (via `tools/sqs-setup.sh`), importar as configurações do Keycloak, e inicializar 3 réplicas concorrentes da aplicação (`wallet-app-1`, `wallet-app-2`, `wallet-app-3` nas portas 8081, 8082, 8083).
 
-### Passo a Passo:
+2. Acesse a rota de métricas de uma das aplicações para garantir que está de pé:
+   ```bash
+   curl http://localhost:8081/metrics
+   ```
 
-1. Subir os serviços de infraestrutura:
-```bash
-docker compose up -d
-```
-2. Inicializar o serviço:
-```bash
-go mod tidy
-go run ./cmd/wallet-service
-```
-O serviço rodará na porta `8080`.
+3. Geração do Token OIDC (Keycloak admin):
+   ```bash
+   curl -X POST http://localhost:8180/realms/wallet/protocol/openid-connect/token \
+     -d "client_id=wallet-api" \
+     -d "client_secret=secret" \
+     -d "grant_type=client_credentials"
+   ```
 
-## Scripts Úteis
+4. Executando os Testes Unitários e de Integração (simula concorrência, deadlocks, lost updates):
+   ```bash
+   go test ./... -v
+   go test ./test/integration/... -tags=integration -v
+   ```
 
-- Testes Unitários e de Concorrência:
-```bash
-go test -v -race ./...
-```
+## Variáveis de Ambiente
+Renomeie ou utilize o `.env.example` local se for rodar o binário `go run cmd/wallet-service/main.go`.
+
+Para mais detalhes sobre as decisões, consulte [ARCHITECTURE.md](ARCHITECTURE.md).

@@ -1,37 +1,28 @@
-# Architecture & Design Decisions
+# Decisões de Arquitetura
 
-## 1. Domain-Driven Design & Hexagonal Architecture
-A aplicação foi estruturada seguindo os princípios de DDD e Arquitetura Hexagonal (Ports and Adapters):
-- **Core Domain (`internal/domain`)**: Contém as regras de negócio puras (`Money`, `WagerTransaction`, `Wallet`). Não possui nenhuma dependência externa.
-- **Use Cases (`internal/app/usecases`)**: Orquestra as regras de negócio usando as portas (interfaces) do banco de dados e gerenciadores de transação.
-- **Infrastructure (`internal/infra`)**: Implementa os adaptadores (PostgreSQL com `pgxpool`, SQS, HTTP Handlers com Uber Fx e Autenticação OIDC).
+Este documento explica as soluções implementadas para garantir exatidão financeira, concorrência e tolerância a falhas na manipulação distribuída de carteiras.
 
-## 2. Composição e Ciclo de Vida (Uber Fx)
-Utilizamos **Uber Fx** para injeção de dependências e controle de ciclo de vida:
-- Todas as dependências (configurações, conexões com o banco de dados, SQS, repositórios, handlers e background workers) são fornecidas via `fx.Provide`.
-- O servidor HTTP, os consumidores SQS e os Workers (Outbox e Pending Reference) são inicializados de forma concorrente e atrelados aos hooks `OnStart` e `OnStop` do `fx.Lifecycle`.
-- Durante um shutdown gracioso, o Fx garante que as conexões sejam liberadas de forma segura e que nenhum processamento fique pela metade.
+## 1. Zero-Float e Exatidão Monetária
+Todo valor que entra na aplicação (`"100.00"`) é imediatamente convertido para centavos de moeda fiduciária num `int64` fixado em escala 2 (`10000`). Utiliza-se a estrutura `Money` no domínio para garantir o isolamento sem risco de erros de ponto flutuante, realizando validações estritas (ex: `LOSS` exige valor 0.00). 
 
-## 3. Precisão Financeira
-- **Zero Float Rule**: Valores monetários NUNCA passam por `float32` ou `float64`.
-- A entrada `"100.00"` é interpretada diretamente via manipulação de string para `int64`, com checagem rígida de regex.
-- Os cálculos são realizados nativamente com inteiros na escala de centavos, prevenidos contra *overflows* (`math.MaxInt64`), garantindo exatidão na persistência.
+## 2. PostgreSQL e Concorrência Segura (Pessimistic Locking)
+O PostgreSQL foi utilizado como fonte da verdade transacional utilizando `pgxpool`.
+Todas as alterações em uma mesma carteira ocorrem dentro de um `pgx.Tx` travando a respectiva linha de balance da carteira via `SELECT ... FOR UPDATE`. Isso blinda a transação contra o fenômeno "Lost Update" ao receber requests paralelos das três instâncias do *wallet-app*.
 
-## 4. Persistência de Dados e Idempotência Persistente
-Para garantir consistência e evitar ataques de repetição:
-- **Ledger Append-Only**: A tabela `wallet_ledger` conta com um gatilho nativo no PostgreSQL que impede `UPDATE` e `DELETE`.
-- **Prevenção de Lost Updates**: Utilizou-se lock pessimista no PostgreSQL (`SELECT ... FOR UPDATE`) na carteira do jogador, serializando qualquer alteração simultânea de saldo.
-- **Idempotência Forte**: A tabela `wager_transactions` possui a constraint `UNIQUE(provider_id, external_transaction_id)`. Se um hash de payload diferente chegar para a mesma transação, a operação falha (HTTP 409). Se o payload for o mesmo, o processamento devolve a resposta que estava persistida em banco.
+## 3. Idempotência Persistente Forte
+Para suportar o *at-least-once* (entrega múltipla pela web ou SQS), empregamos uma tabela de transações. Antes da alteração, há uma busca via `external_transaction_id` + `provider_id`.
+- Se existir uma tentativa prévia e for do exato mesmo hash/payload: Retornamos `HTTP 200 OK` (Replay) sem gerar duplo débito.
+- Se a tentativa prévia possuir hash diferente: `HTTP 409 Conflict`.
 
-## 5. Garantia At-Least-Once e Transações Distribuídas
-Em um ambiente distribuído com SQS:
-- **Deduplicação Atômica**: A tabela `inbox_messages` previne a entrega duplicada pela mesma fila no padrão *Transactional Inbox*, e tudo é executado dentro da mesma transação SQL (`pgx.Tx`).
-- **Transactional Outbox**: Todo evento disparado ("WagerTransactionProcessed") não é enviado diretamente ao SQS, mas salvo atomicamente na tabela `outbox_events`. Um `OutboxWorker` pesquisa e envia as mensagens usando `FOR UPDATE SKIP LOCKED`, garantindo que não existam concorrências de leitura nos nós do Outbox e previnindo a perda de mensagens se o processo principal falhar.
+## 4. Pending References e Assincronicidade
+Um `ROLLBACK` (estorno) pode chegar *antes* da transação alvo (`BET`) devido à latência de rede. Nesses cenários, gravamos o ROLLBACK com o status `PENDING_REFERENCE`. O worker secundário (`PendingReferenceWorker`) com *exponential backoff* reavalia ciclicamente até o `BET` surgir (resolvendo o saldo), ou até atingir timeout e abortar o rollback como falho (`FailureReferenceNotFound`).
 
-## 6. Worker de Referências Pendentes
-Quando uma referência ausente ou pendente é informada, o sistema usa retries distribuídos (em vez de bloquear threads esperando).
-A operação é salva como `PENDING_REFERENCE`. O `PendingReferenceWorker` consome em lote a cada poucos segundos, permitindo que a referência chegue, e rejeita as pendências quando excedem o prazo de 10 minutos.
+## 5. Event Driven & Transactional Outbox
+Eventos de domínio (`WagerTransactionProcessed`, `WalletBalanceChanged`, etc) jamais são disparados de maneira "chutável". Utilizamos o padrão *Transactional Outbox*: os eventos são gravados na tabela `outbox_events` na MESMA transação ACID que debita a carteira.
+Um worker assíncrono consome essa tabela travando a linha com `SELECT ... FOR UPDATE SKIP LOCKED` e, com exclusividade, pública no SQS (`outbox-events.fifo`) com deduplicação de SQS ativada (DLQ suportada).
 
-## 7. Autenticação e Multitenancy
-- A integração com **Keycloak** via OIDC permite que clientes do tipo `client_credentials` emitam tokens seguros.
-- O Middleware HTTP valida os tokens, insere o `provider_id` no contexto, e barra provedores de consultarem transações ou movimentarem o saldo de terceiros, garantindo o isolamento da arquitetura Multitenant.
+## 6. Autenticação e Autorização via OIDC (Keycloak)
+Para controlar permissões, utilizamos o Keycloak como IdP (`client_credentials`). Através do token JWT decodificado no middleware (`azp` (Authorized Party)), mapeamos o real `providerId` que executa a transação, impedindo que Provedor A tente processar pagamentos na transação do Provedor B.
+
+## 7. Graceful Shutdown & Contextos
+Implementamos encerramentos elegantes (SIGINT/SIGTERM) utilizando o Lifecycle Hook do Uber Fx. Todo processamento de consumidores (SQS Long Polling) ou workers escutam canais contextuais para evitar a interrupção abrupta no meio de um processamento, protegendo os registros da transação local.
